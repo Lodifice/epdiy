@@ -10,6 +10,7 @@ struct server {
    ip4_addr_t *ip_address; 
    struct pollfd sockets[4];
    int client_priorities[3];
+   int active_client;
 };
 
 struct server create_server(void);
