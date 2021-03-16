@@ -1,5 +1,8 @@
 #include "server.h"
 
+#include "command.h"
+#include "esp_err.h"
+#include "esp_types.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -8,6 +11,10 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <lwip/netdb.h>
+#include <sys/cdefs.h>
+#include <sys/types.h>
+
+#include "epd_driver.h"
 
 #include "protocol.h"
 
@@ -96,6 +103,8 @@ static bool try_add_client(struct server *server, int client_socket) {
     for (int i = 1; i < nsockets(*server); ++i) {
         if (server->sockets[i].fd == -1) {
             server->sockets[i].fd = client_socket;
+            server->client_cmdbuf_position[i-1] = 0;
+            ESP_LOGI(TAG, "Accepted client %d", i);
             return true;
         }
     }
@@ -154,15 +163,31 @@ static void notify_client(struct server *server, int client, enum opcode code) {
     }
 }
 
-static void handle_message(struct server *server, int client, char data[]) {
-    switch (data[0]) {
+static void handle_message(struct server *server, int client) {
+    union ClientCommand cmd = server->client_commands[client-1];
+    switch (cmd.tag) {
         case CLIENT_HELLO:
-            prioritize_client(server, client, data[1]);
+            prioritize_client(server, client, cmd.hello.priority);
             break;
         case CLIENT_GOODBYE:
             remove_client(server, client, true);
             break;
         case CLIENT_DRAW:
+            {
+                //ESP_LOGI(TAG, "Draw command with offset %d, amount %d, time %d size: %d", cmd.draw.offset, cmd.draw.amount, cmd.draw.time, cmd.draw.size);
+                int64_t t1 = esp_timer_get_time();
+                draw_lines(&cmd.draw, server->sockets[client].fd);
+                int64_t t2 = esp_timer_get_time();
+                printf("Frame received in %lld ms\n", (t2 - t1) / 1000);
+                break;
+            }
+        case CLIENT_POWER:
+            ESP_LOGI(TAG, "Power status: %d", cmd.power.status);
+            if (cmd.power.status) {
+                epd_poweron();
+            } else {
+                epd_poweroff();
+            }
             break;
         default:
             notify_client(server, client, SERVER_INVALID);
@@ -200,6 +225,8 @@ int serve(struct server *server) {
                         ESP_LOGE(TAG, "Unable to accept connection: errno %d", errno);
                         return fd;
                     }
+                    // This should be inherited from the listening socket
+                    // ... but apparently not on our platform
                     int opt = 1;
                     int err = ioctl(fd, FIONBIO, (char *)&opt);
                     if (err < 0) {
@@ -211,12 +238,14 @@ int serve(struct server *server) {
                 } while (fd != - 1);
                 continue;
             }
+
             // socket of client connection
-            char buffer[256];
+            ssize_t bufpos = server->client_cmdbuf_position[i - 1];
+            ssize_t maximum_read = sizeof(union ClientCommand) - bufpos;
+            uint8_t *cmdbuf = ((uint8_t*)&server->client_commands[i - 1]) + bufpos;
             ssize_t len_read = -1;
             do {
-                len_read = recv(server->sockets[i].fd, buffer, sizeof buffer, 0);
-                //len_read = recv(server->sockets[i].fd, buffer, sizeof buffer, MSG_DONTWAIT);
+                len_read = recv(server->sockets[i].fd, cmdbuf, maximum_read, 0);
                 if (len_read < 0) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
                         break;
@@ -229,11 +258,16 @@ int serve(struct server *server) {
                     remove_client(server, i, false);
                     break;
                 }
-                handle_message(server, i, buffer);
+                bufpos += len_read;
+                // command is complete
+                if (bufpos == sizeof(union ClientCommand)) {
+                    handle_message(server, i);
+                    bufpos = 0;
+                }
+                server->client_cmdbuf_position[i - 1] = bufpos;
                 // FIXME removing client in handle message leads to EBADF on
                 // the next recv
                 // doesn't matter, but should be done nicer
-                ESP_LOGI(TAG, "Message: %s", buffer);
             } while (len_read > 0);
         }
     } while (ret >= 0);

@@ -8,6 +8,7 @@
 #include <lwip/netdb.h>
 #include <nvs_flash.h>
 
+#include "esp_wifi_types.h"
 #include "util.h"
 #include "wifi_config.h"
 
@@ -39,9 +40,11 @@ ip4_addr_t *connect_to_wifi(void) {
     }
 
     ESP_ERROR_CHECK(ret);
+
     ESP_ERROR_CHECK(esp_netif_init());
-    tcpip_adapter_init();
+
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_netif_create_default_wifi_sta();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -65,6 +68,8 @@ ip4_addr_t *connect_to_wifi(void) {
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_start());
 
     while (ip_address == NULL) {

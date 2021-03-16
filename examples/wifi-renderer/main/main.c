@@ -26,6 +26,7 @@
 #include "epd_driver.h"
 
 #include "server.h"
+#include "command.h"
 #include "util.h"
 #include "wifi.h"
 
@@ -41,13 +42,9 @@
 
 static const char *TAG = "wifi-renderer";
 
-void app_main() {
-    epd_init();
-    delay(300);
-    epd_poweron();
-    epd_clear();
-    epd_poweroff();
+void serve_task() {
 
+    initialize_display_data();
     struct server server = create_server();
     server.ip_address = connect_to_wifi();
     ESP_LOGI(TAG, "network connection established");
@@ -60,5 +57,18 @@ void app_main() {
     heap_caps_print_heap_info(MALLOC_CAP_INTERNAL);
     heap_caps_print_heap_info(MALLOC_CAP_SPIRAM);
 
-    ret = serve(&server);
+
+    while (true) {
+        serve(&server);
+    }
+}
+
+void app_main() {
+    /*
+    epd_poweron();
+    epd_clear();
+    epd_poweroff();
+    */
+
+    xTaskCreate(&serve_task, "serve_task", 1 << 12, NULL, 1, NULL);
 }
