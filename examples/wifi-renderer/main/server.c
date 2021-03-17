@@ -22,6 +22,7 @@
 #define POLL_TIMEOUT 1000
 
 static const char *TAG = "wifi-renderer";
+int64_t t1, t2;
 
 
 struct server create_server(void) {
@@ -135,9 +136,9 @@ int serve(struct server *server) {
                         }
                         case 'D': {
                             //ESP_LOGI(TAG, "Draw command with offset %d, amount %d, time %d size: %d", cmd.draw.offset, cmd.draw.amount, cmd.draw.time, cmd.draw.size);
-                            int64_t t1 = esp_timer_get_time();
+                            t1 = esp_timer_get_time();
                             draw_lines(&cmd.draw, server->sockets[i].fd);
-                            int64_t t2 = esp_timer_get_time();
+                            t2 = esp_timer_get_time();
                             printf("Frame received in %lld ms\n", (t2 - t1) / 1000);
                             break;
                         }
