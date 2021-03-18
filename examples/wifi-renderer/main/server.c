@@ -24,6 +24,7 @@
 #define POLL_TIMEOUT 2000
 
 static const char *TAG = "wifi-renderer";
+int64_t t1, t2;
 
 static void notify_client(struct server *, int, enum opcode);
 

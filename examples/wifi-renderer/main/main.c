@@ -70,5 +70,5 @@ void app_main() {
     epd_poweroff();
     */
 
-    xTaskCreate(&serve_task, "serve_task", 1 << 12, NULL, 1, NULL);
+    xTaskCreatePinnedToCore(&serve_task, "serve_task", 1 << 12, NULL, 1, NULL, 0);
 }

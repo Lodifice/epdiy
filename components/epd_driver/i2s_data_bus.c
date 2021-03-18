@@ -107,6 +107,7 @@ void IRAM_ATTR i2s_start_line_output() {
   // sth is pulled up through peripheral interrupt
   gpio_set_level(start_pulse_pin, 0);
   dev->conf.tx_start = 1;
+  while (!dev->state.tx_idle) {};
 }
 
 void i2s_bus_init(i2s_bus_config *cfg) {
@@ -167,7 +168,7 @@ void i2s_bus_init(i2s_bus_config *cfg) {
   rtc_clk_apll_enable(1, 0, 0, 8, 0);
 #else
   // Initialize Audio Clock (APLL) for 60 Mhz.
-  rtc_clk_apll_enable(1, 0, 0, 5, 1);
+  rtc_clk_apll_enable(1, 0, 0, 8, 0);
 #endif
 
   // Set Audio Clock Dividers
