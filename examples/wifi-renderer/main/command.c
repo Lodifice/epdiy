@@ -114,6 +114,15 @@ void IRAM_ATTR draw_lines(const DrawCmd* cmd, int fd) {
         ssize_t left = cmd->size - total_consumed - buffer_len;
         ssize_t to_read = (left < DECODE_BUF_SIZE - buffer_len) ? left : DECODE_BUF_SIZE - buffer_len;
         ssize_t len_read = recv(fd, buf + buffer_len, to_read, 0);
+        if (len_read < 0) {
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                vTaskDelay(1);
+                continue;
+            }
+            // fixme: error handling
+            assert(false);
+        }
+        assert(len_read > 0);
         buffer_len += len_read;
 
         int shrink_by = decompress_line((uint32_t*)buf, buffer_len);

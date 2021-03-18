@@ -139,7 +139,8 @@ static void remove_client(struct server *server, int client, bool notify) {
 
 static void prioritize_client(struct server *server, int client, int priority) {
     server->client_priorities[client-1] = priority;
-    //print_debug(server);
+    ESP_LOGI(TAG, "prioritized client %d with %d.", client, priority);
+    print_debug(server);
     if (priority > server->client_priorities[server->active_client-1]) {
         if (server->active_client > 0) {
             notify_client(server, server->active_client, SERVER_ENQUEUED_CLIENT);
@@ -190,8 +191,10 @@ static void handle_message(struct server *server, int client) {
                 epd_poweroff();
             }
             break;
-        default:
+        default: {
             notify_client(server, client, SERVER_INVALID);
+            ESP_LOGI(TAG, "unknown command: %c", cmd.tag);
+        }
     }
 }
 
@@ -199,11 +202,11 @@ int serve(struct server *server) {
     int ret = 0;
     do {
         ret = poll(server->sockets, nsockets(*server), POLL_TIMEOUT);
-        print_debug(server);
-        ESP_LOGI(TAG, "Poll: %d", ret);
         if (ret <= 0) {
             continue;
         }
+        print_debug(server);
+        ESP_LOGI(TAG, "Poll: %d", ret);
         for (int i = 0; i < nsockets(*server); ++i) {
             if (server->sockets[i].revents == 0) {
                 continue;
@@ -240,12 +243,12 @@ int serve(struct server *server) {
                 continue;
             }
 
-            // socket of client connection
-            ssize_t bufpos = server->client_cmdbuf_position[i - 1];
-            ssize_t maximum_read = sizeof(union ClientCommand) - bufpos;
-            uint8_t *cmdbuf = ((uint8_t*)&server->client_commands[i - 1]) + bufpos;
             ssize_t len_read = -1;
             do {
+                // socket of client connection
+                ssize_t bufpos = server->client_cmdbuf_position[i - 1];
+                ssize_t maximum_read = sizeof(union ClientCommand) - bufpos;
+                uint8_t *cmdbuf = ((uint8_t*)&server->client_commands[i - 1]) + bufpos;
                 len_read = recv(server->sockets[i].fd, cmdbuf, maximum_read, 0);
                 if (len_read < 0) {
                     if (errno == EWOULDBLOCK || errno == EAGAIN) {
