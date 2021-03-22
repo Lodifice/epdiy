@@ -82,18 +82,20 @@ int IRAM_ATTR decompress_line(const uint32_t* input, size_t input_size) {
         uint32_t run_counter = (marker & 0xFFFF);
         decomp_state.out_of_run_counter = (marker & 0x0FFF0000) >> 16;
         uint32_t run_value = *(input++);
-        //ESP_LOGI("comp", "%d run of %X, %d run of uncompressed input.", run_counter, run_value, decomp_state.out_of_run_counter);
+        ESP_LOGI("comp", "%d run of %X, %d run of uncompressed input.", run_counter, run_value, decomp_state.out_of_run_counter);
 
         while (run_counter > 0) {
             decomp_state.line_buf[decomp_state.line_pos] = run_value;
             decomp_state.line_pos++;
             // line done
             if (decomp_state.line_pos == LINE_SIZE) {
-                xQueueSendToBack(line_queue, (void*)(&decomp_state.line_buf[0]), portMAX_DELAY);
+                ESP_LOGI("comp", "line done");
+                xQueueSendToBack(line_queue, decomp_state.line_buf, portMAX_DELAY);
                 decomp_state.line_pos = 0;
             }
             run_counter--;
         }
+        ESP_LOGI("comp", "now processing %d uncompressed", decomp_state.out_of_run_counter);
 
         size_t remaining_consumable = consumable_input - (input - input_start);
         input += consume_remaining_out_of_run(input, remaining_consumable);

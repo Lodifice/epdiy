@@ -161,6 +161,7 @@ void IRAM_ATTR epd_output_row(uint32_t output_time_dus) {
 #endif
 
   i2s_start_line_output();
+  i2s_switch_buffer();
 }
 
 void epd_end_frame() {

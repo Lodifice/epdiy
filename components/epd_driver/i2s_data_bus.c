@@ -107,7 +107,7 @@ void IRAM_ATTR i2s_start_line_output() {
   // sth is pulled up through peripheral interrupt
   gpio_set_level(start_pulse_pin, 0);
   dev->conf.tx_start = 1;
-  while (!dev->state.tx_idle) {};
+  //while (!output_done) {};
 }
 
 void i2s_bus_init(i2s_bus_config *cfg) {

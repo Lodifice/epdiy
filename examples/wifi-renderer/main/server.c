@@ -154,14 +154,20 @@ static void prioritize_client(struct server *server, int client, int priority) {
 
 static void notify_client(struct server *server, int client, enum opcode code) {
     char answer = code;
-    ssize_t len = send(server->sockets[client].fd, &answer, sizeof answer, 0);
-    if (len < 0) {
-        if (errno == EWOULDBLOCK || errno == EAGAIN) {
-            ESP_LOGE(TAG, "Sending to client would block, deleting client");
-        } else {
-            ESP_LOGE(TAG, "Error in sending to client, deleting client");
+    while (true) {
+        ssize_t len = send(server->sockets[client].fd, &answer, sizeof answer, 0);
+        if (len < 0) {
+            if (errno == EWOULDBLOCK || errno == EAGAIN) {
+                vTaskDelay(1);
+                continue;
+                //ESP_LOGE(TAG, "Sending to client would block, deleting client");
+            } else {
+                ESP_LOGE(TAG, "Error in sending to client, deleting client");
+            }
+            remove_client(server, client, false);
+            break;
         }
-        remove_client(server, client, false);
+        break;
     }
 }
 
@@ -178,18 +184,18 @@ static void handle_message(struct server *server, int client) {
             {
                 //ESP_LOGI(TAG, "Draw command with offset %d, amount %d, time %d size: %d", cmd.draw.offset, cmd.draw.amount, cmd.draw.time, cmd.draw.size);
                 int64_t t1 = esp_timer_get_time();
-                epd_poweron();
                 draw_lines(&cmd.draw, server->sockets[client].fd);
-                epd_poweroff();
                 int64_t t2 = esp_timer_get_time();
                 printf("Frame received in %lld ms\n", (t2 - t1) / 1000);
-                //notify_client(server, client, SERVER_DRAW_SUCCESSFUL);
+                notify_client(server, client, SERVER_DRAW_SUCCESSFUL);
                 break;
             }
         case CLIENT_POWER:
             ESP_LOGI(TAG, "Power status: %d", cmd.power.status);
             if (cmd.power.status) {
+                epd_poweron();
             } else {
+                epd_poweroff();
             }
             break;
         default: {
